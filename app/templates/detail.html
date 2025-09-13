@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Item Detail — Clothing WebApp{% endblock %}
+{% block content %}
+  <div class="p-4 bg-white rounded shadow-sm">
+    <h4 class="mb-1">{{ item.clothes_title }}</h4>
+    <div class="text-muted mb-3">
+      Rating: {{ item.rating }} • {{ item.division }} / {{ item.department }} / {{ item.class }}
+    </div>
+    <p class="mb-3">{{ item.clothes_desc }}</p>
+    <a class="btn btn-primary" href="{{ url_for('main.new_review', item_id=item.id) }}">Create Review for this Item</a>
+  </div>
+{% endblock %}

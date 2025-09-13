@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Metrics — Clothing WebApp{% endblock %}
+{% block content %}
+  <div class="p-4 bg-white rounded shadow-sm">
+    <h4 class="mb-3">Model Metrics & Manifest</h4>
+
+    {% if not exists %}
+      <div class="alert alert-warning">
+        No model found. Expected bundle at <code>{{ bundle_path }}</code>.
+      </div>
+      <p class="mb-0">Export <code>model/ensemble.pkl</code> and <code>model/manifest.json</code> from your notebook.</p>
+    {% else %}
+      {% if not manifest %}
+        <p class="text-muted mb-0">Bundle exists, but manifest not found or invalid.</p>
+      {% else %}
+        <ul class="mb-0">
+          <li><strong>Name:</strong> {{ manifest.bundle_name or 'N/A' }}</li>
+          <li><strong>Tokenizer:</strong> {{ manifest.tokenizer or 'N/A' }}</li>
+          <li><strong>Notes:</strong> {{ manifest.notes or '' }}</li>
+        </ul>
+        {% if manifest.weights %}
+          <hr>
+          <h6>Ensemble weights</h6>
+          <ul class="mb-0">
+            {% for k, v in manifest.weights.items() %}
+              <li><code>{{ k }}</code> → {{ v }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      {% endif %}
+    {% endif %}
+  </div>
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Search — Clothing WebApp{% endblock %}
+{% block content %}
+  <div class="p-4 bg-white rounded shadow-sm mb-3">
+    <form method="get" action="{{ url_for('main.search') }}" class="row g-2">
+      <div class="col-md-10">
+        <input type="text" name="q" class="form-control" placeholder="Search by keywords (e.g., dress, wool coat)" value="{{ q or '' }}">
+      </div>
+      <div class="col-md-2 d-grid">
+        <button class="btn btn-primary">Search</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="p-3 bg-white rounded shadow-sm">
+    <p class="mb-3"><strong>{{ total }}</strong> matches</p>
+    <div class="row g-3">
+      {% for it in items %}
+        <div class="col-md-6 col-lg-4">
+          <div class="card h-100">
+            <div class="card-body">
+              <h6 class="card-title mb-1">{{ it.clothes_title }}</h6>
+              <div class="text-muted small mb-2">
+                Rating: {{ it.rating }} • {{ it.division }} / {{ it.department }} / {{ it.class }}
+              </div>
+              <p class="card-text">{{ it.preview }}</p>
+              <a class="btn btn-sm btn-outline-primary" href="{{ url_for('main.item_detail', item_id=it.id) }}">View</a>
+            </div>
+          </div>
+        </div>
+      {% else %}
+        <p class="text-muted">No items.</p>
+      {% endfor %}
+    </div>
+  </div>
+{% endblock %}

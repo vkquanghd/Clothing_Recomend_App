@@ -1,0 +1,18 @@
+# Web
+flask==3.0.3
+jinja2==3.1.4
+
+#
+numpy==1.26.4
+scipy==1.11.4
+pandas==2.2.2
+
+# ML / NLP
+scikit-learn==1.4.2
+nltk==3.9.1
+gensim==4.3.3
+joblib==1.4.2
+
+# Viz (optional but handy)
+matplotlib==3.8.4
+seaborn==0.13.2

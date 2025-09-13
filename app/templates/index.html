@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Home — Clothing WebApp{% endblock %}
+{% block content %}
+  <div class="p-4 bg-white rounded shadow-sm">
+    <h3 class="mb-3">Welcome</h3>
+    <p class="mb-3">
+      Use <strong>Search</strong> to browse items, open an item’s detail page, and create a <strong>New Review</strong>.
+      The model (ensemble) suggests a recommended label for the review; you can override it before saving.
+    </p>
+    <a class="btn btn-primary me-2" href="{{ url_for('main.search') }}">Search Items</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('main.new_review') }}">Create Review</a>
+  </div>
+{% endblock %}

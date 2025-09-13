@@ -1,0 +1,13 @@
+{
+  "bundle_name": "Count+TFIDF+LSA LR (equal-weight ensemble)",
+  "weights": {
+    "count_lr": 1.0,
+    "tfidf_lr": 1.0,
+    "svd_lr": 1.0
+  },
+  "tokenizer": "regex+light",
+  "notes": "Milestone II export; all models trained on Review Text.",
+  "samples": 19662,
+  "positives": 16087,
+  "data_csv": "/Users/mac/Desktop/dem-web/data/assignment3_II.csv"
+}
