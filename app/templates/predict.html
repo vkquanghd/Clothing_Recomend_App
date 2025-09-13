@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="mb-3">Quick Predict</h2>
+
+<form method="post" class="mb-3" action="{{ url_for('review.predict') }}">
+  <div class="mb-3">
+    <label class="form-label">Text</label>
+    <textarea name="text" class="form-control" rows="5" placeholder="Enter text to predict...">{{ text or '' }}</textarea>
+  </div>
+  <button class="btn btn-primary">Predict</button>
+</form>
+
+{% if proba is not none %}
+  <div class="alert alert-{{ 'success' if result==1 else 'secondary' }}">
+    Result: <b>{{ 'POSITIVE' if result==1 else 'NEGATIVE' }}</b> —
+    Ensemble Probability: <b class="prob">{{ (proba*100)|round(2) }}%</b>
+  </div>
+{% endif %}
+{% endblock %}

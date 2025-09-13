@@ -1,48 +1,42 @@
 {% extends "base.html" %}
-{% block title %}New Review — Clothing WebApp{% endblock %}
 {% block content %}
-  <div class="p-4 bg-white rounded shadow-sm">
-    <h4 class="mb-3">Create a New Review</h4>
-    <form method="post" action="{{ url_for('main.new_review') }}" class="row g-3">
-      <input type="hidden" name="item_id" value="{{ item_id or '' }}">
-      <div class="col-12">
-        <label class="form-label">Title (optional)</label>
-        <input type="text" name="title" class="form-control" value="{{ title or '' }}">
-      </div>
-      <div class="col-12">
-        <label class="form-label">Review Text <span class="text-danger">*</span></label>
-        <textarea name="review_text" rows="5" class="form-control" required>{{ review_text or '' }}</textarea>
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">Rating (1–5)</label>
-        <input type="number" name="rating" class="form-control" min="1" max="5" value="{{ rating or '' }}">
-      </div>
+<h2 class="mb-3">New Review</h2>
 
-      {% if suggested %}
-        <div class="col-12">
-          <div class="alert alert-info">
-            <strong>Model suggestion:</strong>
-            Probability (class 1 = recommended) = <strong>{{ (suggested.prob*100) | round(2) }}%</strong>.
-            Suggested label = <span class="badge text-bg-{{ 'success' if suggested.label==1 else 'secondary' }}">{{ suggested.label }}</span>
-          </div>
-        </div>
-        <div class="col-md-4">
-          <label class="form-label">Final label</label>
-          <select name="label" class="form-select">
-            <option value="1" {% if suggested.label==1 %}selected{% endif %}>1 (recommended)</option>
-            <option value="0" {% if suggested.label==0 %}selected{% endif %}>0 (not recommended)</option>
-          </select>
-        </div>
-        <div class="col-12">
-          <input type="hidden" name="confirm" value="yes">
-          <button class="btn btn-primary">Save Review</button>
-          <a class="btn btn-outline-secondary" href="{{ url_for('main.new_review', item_id=item_id) }}">Start Over</a>
-        </div>
-      {% else %}
-        <div class="col-12">
-          <button class="btn btn-primary">Get Suggestion</button>
-        </div>
-      {% endif %}
-    </form>
+<form method="post" action="{{ url_for('review.new_review') }}">
+  <div class="mb-3">
+    <label class="form-label">Title</label>
+    <input type="text" class="form-control" name="title" value="{{ title or '' }}" placeholder="Title...">
   </div>
+  <div class="mb-3">
+    <label class="form-label">Review</label>
+    <textarea class="form-control" rows="5" name="review" placeholder="Review text...">{{ review or '' }}</textarea>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Rating (1–5)</label>
+    <input type="number" class="form-control" name="rating" min="1" max="5" value="{{ rating or '' }}">
+  </div>
+  <button class="btn btn-primary">Get Suggestion</button>
+</form>
+
+{% if suggested is not none %}
+  <hr>
+  <div class="alert alert-{{ 'success' if suggested==1 else 'secondary' }}">
+    Suggestion: <b>{{ 'POSITIVE' if suggested==1 else 'NEGATIVE' }}</b>
+    {% if suggested_p is not none %}
+      — Confidence: <b class="prob">{{ (suggested_p*100)|round(2) }}%</b>
+    {% endif %}
+  </div>
+
+  {% if per_model and per_model|length %}
+    <h5>Per-Model Probabilities</h5>
+    <ul class="list-group mb-3">
+      {% for name, p in per_model %}
+        <li class="list-group-item d-flex justify-content-between">
+          <span>{{ name }}</span>
+          <b class="prob">{{ (p*100)|round(2) }}%</b>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+{% endif %}
 {% endblock %}

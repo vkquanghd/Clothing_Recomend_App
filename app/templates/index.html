@@ -1,13 +1,37 @@
 {% extends "base.html" %}
-{% block title %}Home — Clothing WebApp{% endblock %}
 {% block content %}
-  <div class="p-4 bg-white rounded shadow-sm">
-    <h3 class="mb-3">Welcome</h3>
-    <p class="mb-3">
-      Use <strong>Search</strong> to browse items, open an item’s detail page, and create a <strong>New Review</strong>.
-      The model (ensemble) suggests a recommended label for the review; you can override it before saving.
-    </p>
-    <a class="btn btn-primary me-2" href="{{ url_for('main.search') }}">Search Items</a>
-    <a class="btn btn-outline-secondary" href="{{ url_for('main.new_review') }}">Create Review</a>
+<div class="p-4 bg-light rounded-3">
+  <h1 class="display-6 mb-3">Welcome</h1>
+  <p class="mb-0">This is an NLP demo web app: search catalog items, predict sentiment from reviews, and check model ensemble probabilities.</p>
+</div>
+
+<div class="row mt-4 g-3">
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h5 class="card-title">Search Items</h5>
+        <p class="card-text">Query the catalog JSON and filter items by normalized keywords.</p>
+        <a class="btn btn-primary" href="{{ url_for('search.search') }}">Go to Search</a>
+      </div>
+    </div>
   </div>
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h5 class="card-title">Quick Prediction</h5>
+        <p class="card-text">Enter any text and see the ensemble sentiment probability.</p>
+        <a class="btn btn-primary" href="{{ url_for('review.predict') }}">Go to Predict</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h5 class="card-title">Submit New Review</h5>
+        <p class="card-text">Add a new review with title, content, and rating, then get model suggestions.</p>
+        <a class="btn btn-primary" href="{{ url_for('review.new_review') }}">Create Review</a>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}

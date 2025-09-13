@@ -1,33 +1,46 @@
 {% extends "base.html" %}
-{% block title %}Metrics — Clothing WebApp{% endblock %}
 {% block content %}
-  <div class="p-4 bg-white rounded shadow-sm">
-    <h4 class="mb-3">Model Metrics & Manifest</h4>
+<h2 class="mb-3">Model Information</h2>
 
-    {% if not exists %}
-      <div class="alert alert-warning">
-        No model found. Expected bundle at <code>{{ bundle_path }}</code>.
-      </div>
-      <p class="mb-0">Export <code>model/ensemble.pkl</code> and <code>model/manifest.json</code> from your notebook.</p>
-    {% else %}
-      {% if not manifest %}
-        <p class="text-muted mb-0">Bundle exists, but manifest not found or invalid.</p>
-      {% else %}
-        <ul class="mb-0">
-          <li><strong>Name:</strong> {{ manifest.bundle_name or 'N/A' }}</li>
-          <li><strong>Tokenizer:</strong> {{ manifest.tokenizer or 'N/A' }}</li>
-          <li><strong>Notes:</strong> {{ manifest.notes or '' }}</li>
-        </ul>
-        {% if manifest.weights %}
-          <hr>
-          <h6>Ensemble weights</h6>
-          <ul class="mb-0">
-            {% for k, v in manifest.weights.items() %}
-              <li><code>{{ k }}</code> → {{ v }}</li>
-            {% endfor %}
-          </ul>
-        {% endif %}
-      {% endif %}
-    {% endif %}
+{% if not bundle %}
+  <div class="alert alert-warning">
+    Bundle (ensemble.pkl) not found. Please run notebook/train to create and export the model.
   </div>
+{% else %}
+  <div class="card mb-3">
+    <div class="card-body">
+      <p class="mb-1"><b>Name:</b> {{ bundle.name or 'Ensemble' }}</p>
+      {% if bundle.tokenizer_version %}<p class="mb-1"><b>Tokenizer:</b> {{ bundle.tokenizer_version }}</p>{% endif %}
+      {% if bundle.notes %}<p class="mb-0"><b>Notes:</b> {{ bundle.notes }}</p>{% endif %}
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-md-6">
+      <div class="card h-100">
+        <div class="card-header">Weights</div>
+        <ul class="list-group list-group-flush">
+          {% for k,v in bundle.weights.items() %}
+            <li class="list-group-item d-flex justify-content-between">
+              <span>{{ k }}</span><b>{{ v }}</b>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card h-100">
+        <div class="card-header">Models</div>
+        <ul class="list-group list-group-flush">
+          {% for k,m in bundle.models.items() %}
+            <li class="list-group-item">
+              <div class="fw-semibold">{{ k }}</div>
+              <div class="text-muted small">{{ m.__class__.__name__ }}</div>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+{% endif %}
 {% endblock %}

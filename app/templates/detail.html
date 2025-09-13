@@ -1,12 +1,27 @@
 {% extends "base.html" %}
-{% block title %}Item Detail — Clothing WebApp{% endblock %}
 {% block content %}
-  <div class="p-4 bg-white rounded shadow-sm">
-    <h4 class="mb-1">{{ item.clothes_title }}</h4>
-    <div class="text-muted mb-3">
-      Rating: {{ item.rating }} • {{ item.division }} / {{ item.department }} / {{ item.class }}
+{% if not item %}
+  <div class="alert alert-warning">Item not found.</div>
+{% else %}
+  <h2 class="mb-3">{{ item.clothes_title or item.Title }}</h2>
+  <div class="row g-3">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-body">
+          <p class="mb-2">{{ item.clothes_desc or item['Clothes Description'] or item.preview }}</p>
+          <p class="text-muted small mb-0">
+            Division: {{ item.division or '-' }} • Department: {{ item.department or '-' }} • Class: {{ item['class'] or '-' }}
+          </p>
+        </div>
+      </div>
     </div>
-    <p class="mb-3">{{ item.clothes_desc }}</p>
-    <a class="btn btn-primary" href="{{ url_for('main.new_review', item_id=item.id) }}">Create Review for this Item</a>
+    <div class="col-md-4">
+      <ul class="list-group">
+        <li class="list-group-item d-flex justify-content-between"><span>ID</span><b>{{ item.id }}</b></li>
+        <li class="list-group-item d-flex justify-content-between"><span>Rating</span><b>{{ item.rating or '-' }}</b></li>
+      </ul>
+      <a class="btn btn-outline-secondary mt-3" href="{{ url_for('search.search') }}">← Back to Search</a>
+    </div>
   </div>
+{% endif %}
 {% endblock %}

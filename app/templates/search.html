@@ -1,36 +1,112 @@
 {% extends "base.html" %}
-{% block title %}Search — Clothing WebApp{% endblock %}
 {% block content %}
-  <div class="p-4 bg-white rounded shadow-sm mb-3">
-    <form method="get" action="{{ url_for('main.search') }}" class="row g-2">
-      <div class="col-md-10">
-        <input type="text" name="q" class="form-control" placeholder="Search by keywords (e.g., dress, wool coat)" value="{{ q or '' }}">
-      </div>
-      <div class="col-md-2 d-grid">
-        <button class="btn btn-primary">Search</button>
-      </div>
-    </form>
-  </div>
+<div class="container mt-4">
 
-  <div class="p-3 bg-white rounded shadow-sm">
-    <p class="mb-3"><strong>{{ total }}</strong> matches</p>
-    <div class="row g-3">
-      {% for it in items %}
-        <div class="col-md-6 col-lg-4">
+  <h2 class="mb-3">Search</h2>
+
+  <!-- Search + Filters -->
+  <form method="get" action="{{ url_for('search.search') }}" class="mb-3">
+    <div class="row g-2">
+      <div class="col-md-4">
+        <input type="text" name="q" class="form-control" placeholder="Keyword..." value="{{ q }}">
+      </div>
+
+      <div class="col-md-2">
+        <select name="division" class="form-select">
+          <option value="">All divisions</option>
+          {% for v in divisions %}
+            <option value="{{ v }}" {% if v==division %}selected{% endif %}>{{ v }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-2">
+        <select name="department" class="form-select">
+          <option value="">All departments</option>
+          {% for v in departments %}
+            <option value="{{ v }}" {% if v==department %}selected{% endif %}>{{ v }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-2">
+        <select name="class" class="form-select">
+          <option value="">All classes</option>
+          {% for v in classes %}
+            <option value="{{ v }}" {% if v==klass %}selected{% endif %}>{{ v }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-1">
+        <select name="per_page" class="form-select">
+          {% for n in [12,24,48] %}
+            <option value="{{ n }}" {% if per_page==n %}selected{% endif %}>{{ n }}/page</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-1">
+        <button class="btn btn-primary w-100">Search</button>
+      </div>
+    </div>
+  </form>
+
+  <!-- Results -->
+  {% if items|length == 0 %}
+    <div class="alert alert-secondary">No results found.</div>
+  {% else %}
+    <div class="row">
+      {% for item in items %}
+        <div class="col-md-3 mb-4">
           <div class="card h-100">
             <div class="card-body">
-              <h6 class="card-title mb-1">{{ it.clothes_title }}</h6>
-              <div class="text-muted small mb-2">
-                Rating: {{ it.rating }} • {{ it.division }} / {{ it.department }} / {{ it.class }}
+              <h6 class="card-title mb-1">{{ item.clothes_title or item.Title }}</h6>
+              <div class="small text-muted mb-2">
+                {{ item.division }} / {{ item.department }} / {{ item.class }}
               </div>
-              <p class="card-text">{{ it.preview }}</p>
-              <a class="btn btn-sm btn-outline-primary" href="{{ url_for('main.item_detail', item_id=it.id) }}">View</a>
+              <p class="card-text text-muted">{{ (item.preview or '')[:120] }}</p>
+              {% if item.id %}
+                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('search.detail', item_id=item.id) }}">Details</a>
+              {% endif %}
             </div>
           </div>
         </div>
-      {% else %}
-        <p class="text-muted">No items.</p>
       {% endfor %}
     </div>
-  </div>
+  {% endif %}
+
+  <!-- Pagination -->
+  {% if total_pages > 1 %}
+  <nav aria-label="Result pages">
+    <ul class="pagination justify-content-center">
+      {% if page > 1 %}
+      <li class="page-item">
+        <a class="page-link" href="{{ url_for('search.search') }}?{{ base_qs }}&page={{ page-1 }}">Previous</a>
+      </li>
+      {% endif %}
+
+      {% set window = 2 %}
+      {% for p in range(1, total_pages+1) %}
+        {% if p==1 or p==total_pages or (p>=page-window and p<=page+window) %}
+          <li class="page-item {% if p==page %}active{% endif %}">
+            <a class="page-link" href="{{ url_for('search.search') }}?{{ base_qs }}&page={{ p }}">{{ p }}</a>
+          </li>
+        {% elif p==2 and page-window>3 %}
+          <li class="page-item disabled"><span class="page-link">…</span></li>
+        {% elif p==total_pages-1 and page+window<total_pages-2 %}
+          <li class="page-item disabled"><span class="page-link">…</span></li>
+        {% endif %}
+      {% endfor %}
+
+      {% if page < total_pages %}
+      <li class="page-item">
+        <a class="page-link" href="{{ url_for('search.search') }}?{{ base_qs }}&page={{ page+1 }}">Next</a>
+      </li>
+      {% endif %}
+    </ul>
+  </nav>
+  {% endif %}
+
+</div>
 {% endblock %}
