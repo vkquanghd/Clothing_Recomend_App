@@ -1,37 +1,47 @@
 {% extends "base.html" %}
-{% block content %}
-<div class="p-4 bg-light rounded-3">
-  <h1 class="display-6 mb-3">Welcome</h1>
-  <p class="mb-0">This is an NLP demo web app: search catalog items, predict sentiment from reviews, and check model ensemble probabilities.</p>
-</div>
+{% block title %}Home{% endblock %}
 
-<div class="row mt-4 g-3">
-  <div class="col-md-4">
-    <div class="card h-100">
-      <div class="card-body">
-        <h5 class="card-title">Search Items</h5>
-        <p class="card-text">Query the catalog JSON and filter items by normalized keywords.</p>
-        <a class="btn btn-primary" href="{{ url_for('search.search') }}">Go to Search</a>
+{% block content %}
+<form class="input-group mb-3" method="get">
+  <input name="q" class="form-control" placeholder="Search by title/desc/department/class…" value="{{ query or '' }}">
+  <button class="btn btn-primary">Search</button>
+</form>
+
+{% if items|length == 0 %}
+  <div class="alert alert-info">No items found.</div>
+{% else %}
+  <div class="row g-3">
+    {% for it in items %}
+    <div class="col-12 col-md-6 col-lg-4">
+      <div class="card h-100 shadow-sm">
+        <img class="card-img-top" src="{{ url_for('static', filename=it.photo) }}" alt="photo">
+        <div class="card-body">
+          <h5 class="card-title">{{ it.class_name }}</h5>
+          <p class="card-text text-muted">{{ it.description }}</p>
+          <p class="mb-2"><small>Avg ★ {{ '%.2f'|format(it.avg_rating or 0) }} • {{ it.review_count }} reviews</small></p>
+          <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('main.detail', item_id=it.clothing_id) }}">Details</a>
+        </div>
       </div>
     </div>
+    {% endfor %}
   </div>
-  <div class="col-md-4">
-    <div class="card h-100">
-      <div class="card-body">
-        <h5 class="card-title">Quick Prediction</h5>
-        <p class="card-text">Enter any text and see the ensemble sentiment probability.</p>
-        <a class="btn btn-primary" href="{{ url_for('review.predict') }}">Go to Predict</a>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-4">
-    <div class="card h-100">
-      <div class="card-body">
-        <h5 class="card-title">Submit New Review</h5>
-        <p class="card-text">Add a new review with title, content, and rating, then get model suggestions.</p>
-        <a class="btn btn-primary" href="{{ url_for('review.new_review') }}">Create Review</a>
-      </div>
-    </div>
-  </div>
-</div>
+
+  {% if total_pages > 1 %}
+  <nav class="mt-3">
+    <ul class="pagination">
+      <li class="page-item {% if page<=1 %}disabled{% endif %}">
+        <a class="page-link" href="{{ url_for('main.index', q=query, page=page-1, per_page=per_page) }}">Prev</a>
+      </li>
+      {% for p in range(1, total_pages+1) %}
+      <li class="page-item {% if p==page %}active{% endif %}">
+        <a class="page-link" href="{{ url_for('main.index', q=query, page=p, per_page=per_page) }}">{{ p }}</a>
+      </li>
+      {% endfor %}
+      <li class="page-item {% if page>=total_pages %}disabled{% endif %}">
+        <a class="page-link" href="{{ url_for('main.index', q=query, page=page+1, per_page=per_page) }}">Next</a>
+      </li>
+    </ul>
+  </nav>
+  {% endif %}
+{% endif %}
 {% endblock %}

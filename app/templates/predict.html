@@ -1,19 +1,32 @@
 {% extends "base.html" %}
+{% block title %}Quick Predict{% endblock %}
 {% block content %}
-<h2 class="mb-3">Quick Predict</h2>
-
-<form method="post" class="mb-3" action="{{ url_for('review.predict') }}">
-  <div class="mb-3">
-    <label class="form-label">Text</label>
-    <textarea name="text" class="form-control" rows="5" placeholder="Enter text to predict...">{{ text or '' }}</textarea>
-  </div>
-  <button class="btn btn-primary">Predict</button>
-</form>
-
-{% if proba is not none %}
-  <div class="alert alert-{{ 'success' if result==1 else 'secondary' }}">
-    Result: <b>{{ 'POSITIVE' if result==1 else 'NEGATIVE' }}</b> —
-    Ensemble Probability: <b class="prob">{{ (proba*100)|round(2) }}%</b>
-  </div>
+<h4>Quick Predict</h4>
+{% if error %}
+  <div class="alert alert-danger">Model error: {{ error }}</div>
 {% endif %}
+{% if degraded %}
+  <div class="alert alert-warning">Using fallback (rule-based) model so features keep working.</div>
+{% endif %}
+<div class="card">
+  <div class="card-body">
+    <label class="form-label">Text</label>
+    <textarea id="qtext" class="form-control" rows="4">{{ text or '' }}</textarea>
+    <button class="btn btn-primary mt-3" onclick="doPredict()">Predict</button>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function alertBox(msg){const el=document.createElement('div');el.className='alert alert-danger position-fixed top-0 start-50 translate-middle-x mt-3';el.style.zIndex=2000;el.innerText=msg;document.body.appendChild(el);setTimeout(()=>el.remove(),1800);}
+async function doPredict(){
+  const t=document.getElementById('qtext').value.trim(); if(!t){alertBox('Enter text');return;}
+  try{
+    const r=await fetch('{{ url_for("model_info.api_predict") }}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t})});
+    const d=await r.json();
+    if(!d.ok) throw new Error(d.error||'error');
+    alertBox(`Result: ${d.label} (${(d.prob||0).toFixed(2)})${d.degraded?' · fallback':''}`);
+  }catch(e){alertBox('Error: '+e.message);}
+}
+</script>
 {% endblock %}

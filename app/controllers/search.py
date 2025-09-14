@@ -1,120 +1,93 @@
-import json
-from math import ceil
-from urllib.parse import urlencode
-from flask import Blueprint, render_template, request, abort, current_app
-
-from ..config import CATALOG_JSON
+# app/controllers/search.py
+from __future__ import annotations
+from flask import Blueprint, render_template, request, current_app
+import sqlite3
 
 bp = Blueprint("search", __name__)
 
-# ---------- Data helpers ----------
-def _load_items():
-    try:
-        with open(CATALOG_JSON, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            if isinstance(data, list):
-                items = data
-            elif isinstance(data, dict) and "items" in data:
-                items = data["items"]
-            else:
-                items = []
-    except Exception as ex:
-        current_app.logger.warning(f"Failed to load catalog: {ex}")
-        items = []
-    # normalize some keys to avoid KeyError in templates
-    for it in items:
-        it.setdefault("id", None)
-        it.setdefault("clothes_title", it.get("Title", ""))
-        it.setdefault("clothes_desc", it.get("Review Text", ""))
-        it.setdefault("preview", (it.get("clothes_desc") or "")[:100])
-        it.setdefault("division", it.get("Division Name", ""))
-        it.setdefault("department", it.get("Department Name", ""))
-        it.setdefault("class", it.get("Class Name", ""))
-    return items
+def get_db() -> sqlite3.Connection:
+    db_path = current_app.config["DB_PATH"]
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    return conn
 
-def _match_query(q: str, item: dict) -> bool:
-    if not q:
-        return True
-    hay = " ".join([
-        str(item.get("search_text", "")),
-        str(item.get("clothes_title", "")),
-        str(item.get("clothes_desc", "")),
-        str(item.get("Title", "")),
-        str(item.get("Review Text", "")),
-    ]).lower()
-    tokens = q.lower().split()
-    return all(tok in hay for tok in tokens)
-
-def _match_filters(item, division, department, klass):
-    if division and str(item.get("division", "")).lower() != division.lower():
-        return False
-    if department and str(item.get("department", "")).lower() != department.lower():
-        return False
-    if klass and str(item.get("class", "")).lower() != klass.lower():
-        return False
-    return True
-
-def _facets(items):
-    divs = sorted({str(it.get("division", "")).strip() for it in items if str(it.get("division", "")).strip()})
-    deps = sorted({str(it.get("department", "")).strip() for it in items if str(it.get("department", "")).strip()})
-    clss = sorted({str(it.get("class", "")).strip() for it in items if str(it.get("class", "")).strip()})
-    return divs, deps, clss
-
-# ---------- Routes ----------
-@bp.get("/search")
+@bp.route("/search")
 def search():
-    # read query params
-    q          = request.args.get("q", "").strip()
-    page       = max(1, int(request.args.get("page", "1") or "1"))
-    per_page   = int(request.args.get("per_page", "12") or "12")
-    division   = request.args.get("division", "").strip()
-    department = request.args.get("department", "").strip()
-    klass      = request.args.get("class", "").strip()  # 'class' is fine as query param
+    """
+    Keyword + facet search (division/department/class) + pagination.
+    Renders the SAME 'index.html' grid for consistency.
+    """
+    q = request.args.get("q", "").strip().lower()
+    division = request.args.get("division", "").strip().lower()
+    department = request.args.get("department", "").strip().lower()
+    clazz = request.args.get("class", "").strip().lower()
+    page = max(1, int(request.args.get("page", 1)))
+    page_size = 30
+    offset = (page - 1) * page_size
 
-    # load and facet
-    all_items = _load_items()
-    divs, deps, clss = _facets(all_items)
+    where = []
+    params = []
 
-    # filter
-    filtered = [it for it in all_items if _match_query(q, it) and _match_filters(it, division, department, klass)]
+    if q:
+        where.append("(LOWER(i.clothes_title) LIKE ? OR LOWER(i.description) LIKE ?)")
+        params.extend([f"%{q}%", f"%{q}%"])
+    if division:
+        where.append("LOWER(i.division) = ?")
+        params.append(division)
+    if department:
+        where.append("LOWER(i.department) = ?")
+        params.append(department)
+    if clazz:
+        where.append("LOWER(i.class_name) = ?")
+        params.append(clazz)
 
-    # pagination math
-    total = len(filtered)
-    total_pages = max(1, ceil(total / per_page))
-    if page > total_pages:
-        page = total_pages
-    start = (page - 1) * per_page
-    end   = start + per_page
-    page_items = filtered[start:end]
+    where_sql = ("WHERE " + " AND ".join(where)) if where else ""
 
-    # Build a base query string for pagination links WITHOUT 'page'
-    base_qs = urlencode({
-        "q": q,
-        "division": division,
-        "department": department,
-        "class": klass,          # safe here because we're not using it as a Python kwarg
-        "per_page": per_page
-    })
+    conn = get_db()
+
+    # total count of distinct items matching filters
+    total = conn.execute(
+        f"""
+        SELECT COUNT(*) AS cnt
+        FROM (
+            SELECT i.clothing_id
+            FROM items i
+            LEFT JOIN reviews r ON r.clothing_id = i.clothing_id
+            {where_sql}
+            GROUP BY i.clothing_id
+        ) x
+        """
+    , params).fetchone()["cnt"]
+
+    # page data
+    items = conn.execute(
+        f"""
+        SELECT i.clothing_id, i.clothes_title, i.description, i.division, i.department, i.class_name,
+               COUNT(r.id) AS review_count,
+               ROUND(AVG(r.rating), 2) AS avg_rating
+        FROM items i
+        LEFT JOIN reviews r ON r.clothing_id = i.clothing_id
+        {where_sql}
+        GROUP BY i.clothing_id
+        ORDER BY review_count DESC
+        LIMIT ? OFFSET ?;
+        """,
+        (*params, page_size, offset)
+    ).fetchall()
+
+    conn.close()
+
+    total_pages = max(1, (total + page_size - 1) // page_size)
 
     return render_template(
-        "search.html",
-        # filters
-        q=q, division=division, department=department, klass=klass,
-        # data
-        items=page_items, total=total, total_pages=total_pages,
-        # pagination
-        page=page, per_page=per_page, base_qs=base_qs,
-        # facets
-        divisions=divs, departments=deps, classes=clss,
+        "index.html",
+        items=items,
+        query=q,
+        page=page,
+        total_pages=total_pages,
+        division=division,
+        department=department,
+        clazz=clazz,
+        # small flag to let template know it is a "search" context if you want
+        is_search=True,
     )
-
-@bp.get("/detail/<int:item_id>")
-def detail(item_id: int):
-    items = _load_items()
-    for it in items:
-        try:
-            if int(it.get("id", -1)) == item_id:
-                return render_template("detail.html", item=it)
-        except Exception:
-            continue
-    abort(404)

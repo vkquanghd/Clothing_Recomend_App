@@ -1,7 +1,6 @@
 # app/controllers/__init__.py
-# Chỉ cần import các submodule để Flask có thể "thấy" chúng khi from app.controllers import ...
-from . import main
-from . import review
-from . import search
-
-__all__ = ["main", "review", "search"]
+"""
+Blueprints are registered directly in app/__init__.py.
+This module intentionally does not import submodules to avoid side effects.
+"""
+__all__ = []

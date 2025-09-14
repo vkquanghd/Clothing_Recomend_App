@@ -1,24 +1,15 @@
 from flask import Flask
-from .config import DATA_DIR, MODEL_DIR
+from pathlib import Path
 
 def create_app():
     app = Flask(__name__)
-    app.config["JSON_SORT_KEYS"] = False
+    app.config["DB_PATH"] = str((Path(__file__).resolve().parent.parent / "data" / "app.db"))
 
-    # Make sure folders exist (no error if missing; app vẫn chạy)
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    MODEL_DIR.mkdir(parents=True, exist_ok=True)
-
-    # Register blueprints
+    # Blueprints
     from .controllers.main import bp as main_bp
-    from .controllers.review import bp as review_bp
-    from .controllers.search import bp as search_bp
-
     app.register_blueprint(main_bp)
-    app.register_blueprint(review_bp, url_prefix="/")
-    app.register_blueprint(search_bp, url_prefix="/")
+
+    from .controllers.model_info import bp as model_info_bp
+    app.register_blueprint(model_info_bp)         # url_prefix='/model'
 
     return app
-
-# Flask CLI entry
-app = create_app()

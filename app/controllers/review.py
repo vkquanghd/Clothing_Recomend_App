@@ -1,80 +1,89 @@
-from flask import Blueprint, render_template, request
-import numpy as np
+# app/controllers/review.py
+import sqlite3
+from flask import Blueprint, request, jsonify
+from pathlib import Path
+from .main import get_db_path  # dùng cùng helper để đúng đường DB
 
-from .main import load_bundle
+bp = Blueprint("review", __name__, url_prefix="/reviews")
 
-bp = Blueprint("review", __name__)
+def conn():
+    c = sqlite3.connect(get_db_path())
+    c.row_factory = sqlite3.Row
+    return c
 
-def _ensemble_predict(texts, bundle):
-    """
-    Hỗ trợ cả 2 định dạng:
-    - bundle là object có .models (dict<name, pipeline>) & .weights (dict<name,float>)
-    - hoặc bundle là dict tương đương đã được bọc ở main.load_bundle()
-    """
-    if bundle is None or not getattr(bundle, "models", None):
-        return None, []
+# GET one (for edit)
+@bp.get("/<int:review_id>")
+def get_review(review_id):
+    c = conn()
+    r = c.execute("SELECT * FROM reviews WHERE id=?", (review_id,)).fetchone()
+    c.close()
+    if not r: return jsonify({"error":"not found"}), 404
+    return jsonify(dict(r))
 
-    models = bundle.models
-    weights = getattr(bundle, "weights", {})
-    wsum = sum(weights.values()) or 1.0
+# LIST (paged) for item
+@bp.get("/by-item/<int:item_id>")
+def list_reviews(item_id):
+    try: page = max(1, int(request.args.get("page", 1)))
+    except: page = 1
+    try: per = max(1, min(20, int(request.args.get("per_page", 8))))
+    except: per = 8
+    off = (page-1)*per
 
-    per_model = []
-    agg = np.zeros(len(texts), dtype=float)
-    for name, pipe in models.items():
-        try:
-            proba = pipe.predict_proba(texts)[:, 1]
-        except Exception:
-            # Một số model (nếu logistic) chắc chắn có predict_proba; nếu không, dùng decision_function chuẩn hoá về [0,1]
-            df = pipe.decision_function(texts)
-            proba = 1 / (1 + np.exp(-df))
-        w = float(weights.get(name, 0.0))
-        agg += w * proba
-        per_model.append((name, float(proba[0])))
+    c = conn()
+    total = c.execute("SELECT COUNT(*) AS c FROM reviews WHERE clothing_id=?", (item_id,)).fetchone()["c"]
+    rows  = c.execute("""
+        SELECT id, clothing_id, age, title, review_text, rating, recommended, positive_feedback
+        FROM reviews WHERE clothing_id=?
+        ORDER BY id DESC LIMIT ? OFFSET ?
+    """, (item_id, per, off)).fetchall()
+    c.close()
 
-    agg = agg / wsum
-    return float(agg[0]), sorted(per_model, key=lambda x: x[0])
+    next_page = page+1 if off+per < total else None
+    return jsonify({
+        "items": [dict(r) for r in rows],
+        "total": total,
+        "next_page": next_page
+    })
 
-@bp.route("/predict", methods=["GET", "POST"])
-def predict():
-    bundle = load_bundle()
-    text = None
-    proba = None
-    result = None
+# CREATE
+@bp.post("/create/<int:item_id>")
+def create_review(item_id):
+    data = request.get_json(force=True)
+    c = conn()
+    c.execute("""
+      INSERT INTO reviews (clothing_id, age, title, review_text, rating, recommended, positive_feedback)
+      VALUES (?, ?, ?, ?, ?, ?, 0)
+    """, (item_id,
+          int(data.get("age") or 0),
+          data.get("title") or "",
+          data.get("review_text") or "",
+          int(data.get("rating") or 0),
+          int(data.get("recommended") or 0)))
+    c.commit(); c.close()
+    return jsonify({"ok": True})
 
-    if request.method == "POST":
-        text = (request.form.get("text") or "").strip()
-        if text and bundle:
-            p, _ = _ensemble_predict([text], bundle)
-            if p is not None:
-                proba = p
-                result = 1 if proba >= 0.5 else 0
+# UPDATE
+@bp.put("/update/<int:review_id>")
+def update_review(review_id):
+    data = request.get_json(force=True)
+    c = conn()
+    c.execute("""
+      UPDATE reviews
+      SET age=?, title=?, review_text=?, rating=?, recommended=?
+      WHERE id=?
+    """, (int(data.get("age") or 0),
+          data.get("title") or "",
+          data.get("review_text") or "",
+          int(data.get("rating") or 0),
+          int(data.get("recommended") or 0),
+          review_id))
+    c.commit(); c.close()
+    return jsonify({"ok": True})
 
-    return render_template("predict.html", text=text, proba=proba, result=result)
-
-@bp.route("/new", methods=["GET", "POST"])
-def new_review():
-    bundle = load_bundle()
-
-    title = review = rating = None
-    suggested = None
-    suggested_p = None
-    per_model = []
-
-    if request.method == "POST":
-        title   = (request.form.get("title") or "").strip()
-        review  = (request.form.get("review") or "").strip()
-        rating  = (request.form.get("rating") or "").strip()
-        text = " ".join([t for t in [title, review] if t])
-
-        if text and bundle:
-            p, per = _ensemble_predict([text], bundle)
-            if p is not None:
-                suggested_p = p
-                suggested   = 1 if p >= 0.5 else 0
-                per_model   = per
-
-    return render_template(
-        "new_review.html",
-        title=title, review=review, rating=rating,
-        suggested=suggested, suggested_p=suggested_p, per_model=per_model
-    )
+# DELETE
+@bp.delete("/delete/<int:review_id>")
+def delete_review(review_id):
+    c = conn()
+    c.execute("DELETE FROM reviews WHERE id=?", (review_id,))
+    c.commit(); c.close()
+    return jsonify({"ok": True})

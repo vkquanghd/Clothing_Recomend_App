@@ -1,46 +1,9 @@
 {% extends "base.html" %}
+{% block title %}Model Info{% endblock %}
 {% block content %}
-<h2 class="mb-3">Model Information</h2>
-
-{% if not bundle %}
-  <div class="alert alert-warning">
-    Bundle (ensemble.pkl) not found. Please run notebook/train to create and export the model.
-  </div>
-{% else %}
-  <div class="card mb-3">
-    <div class="card-body">
-      <p class="mb-1"><b>Name:</b> {{ bundle.name or 'Ensemble' }}</p>
-      {% if bundle.tokenizer_version %}<p class="mb-1"><b>Tokenizer:</b> {{ bundle.tokenizer_version }}</p>{% endif %}
-      {% if bundle.notes %}<p class="mb-0"><b>Notes:</b> {{ bundle.notes }}</p>{% endif %}
-    </div>
-  </div>
-
-  <div class="row g-3">
-    <div class="col-md-6">
-      <div class="card h-100">
-        <div class="card-header">Weights</div>
-        <ul class="list-group list-group-flush">
-          {% for k,v in bundle.weights.items() %}
-            <li class="list-group-item d-flex justify-content-between">
-              <span>{{ k }}</span><b>{{ v }}</b>
-            </li>
-          {% endfor %}
-        </ul>
-      </div>
-    </div>
-    <div class="col-md-6">
-      <div class="card h-100">
-        <div class="card-header">Models</div>
-        <ul class="list-group list-group-flush">
-          {% for k,m in bundle.models.items() %}
-            <li class="list-group-item">
-              <div class="fw-semibold">{{ k }}</div>
-              <div class="text-muted small">{{ m.__class__.__name__ }}</div>
-            </li>
-          {% endfor %}
-        </ul>
-      </div>
-    </div>
-  </div>
-{% endif %}
+<h4>Model Info</h4>
+<p>Status: <b>{{ status }}</b></p>
+{% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+<p class="text-muted">If you later re-export a proper scikit/dill pickle to <code>model/ensemble_soft.pkl</code>,
+the app will automatically use it and stop the fallback.</p>
 {% endblock %}
