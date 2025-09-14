@@ -1,32 +1,188 @@
 {% extends "base.html" %}
 {% block title %}Quick Predict{% endblock %}
+
 {% block content %}
-<h4>Quick Predict</h4>
-{% if error %}
-  <div class="alert alert-danger">Model error: {{ error }}</div>
-{% endif %}
-{% if degraded %}
-  <div class="alert alert-warning">Using fallback (rule-based) model so features keep working.</div>
-{% endif %}
-<div class="card">
-  <div class="card-body">
-    <label class="form-label">Text</label>
-    <textarea id="qtext" class="form-control" rows="4">{{ text or '' }}</textarea>
-    <button class="btn btn-primary mt-3" onclick="doPredict()">Predict</button>
+<div class="container-sm" style="max-width: 820px;">
+  <h4 class="mb-3">Quick Predict</h4>
+
+  {% if error %}
+    <div class="alert alert-danger">Model error: {{ error }}</div>
+  {% endif %}
+  {% if degraded %}
+    <div class="alert alert-warning">Using fallback (rule-based) model so features keep working.</div>
+  {% endif %}
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <label for="qtext" class="form-label fw-semibold">Text</label>
+      <textarea id="qtext" class="form-control" rows="6" placeholder="Type a review to predict…">{{ text or '' }}</textarea>
+
+      <div class="d-flex gap-2 mt-3">
+        <button class="btn btn-primary" id="btnPredict">
+          <span class="spinner-border spinner-border-sm me-2 d-none" id="predSpin" role="status" aria-hidden="true"></span>
+          Predict
+        </button>
+        <button class="btn btn-outline-secondary" id="btnClear">Clear</button>
+      </div>
+      <div id="statusHint" class="form-text mt-2 d-none">Processing…</div>
+
+      <!-- Error box -->
+      <div id="errorBox" class="alert alert-danger mt-3 d-none" role="alert"></div>
+
+      <!-- Result -->
+      <div id="resultBox" class="mt-4 d-none">
+        <div class="text-center mb-3">
+          <div class="badge rounded-pill text-bg-warning mb-2 d-none" id="badgeDegraded">Fallback</div>
+          <div id="resLabelBox" class="h3 fw-bold mb-0" aria-live="polite"></div>
+        </div>
+
+        <div class="px-2">
+          <div class="d-flex justify-content-between small fw-semibold mb-1">
+            <span>Probability (Positive)</span>
+            <span id="resProbText">0.000</span>
+          </div>
+          <div class="progress" style="height: 12px;">
+            <div id="resBar" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 {% endblock %}
+
 {% block scripts %}
 <script>
-function alertBox(msg){const el=document.createElement('div');el.className='alert alert-danger position-fixed top-0 start-50 translate-middle-x mt-3';el.style.zIndex=2000;el.innerText=msg;document.body.appendChild(el);setTimeout(()=>el.remove(),1800);}
-async function doPredict(){
-  const t=document.getElementById('qtext').value.trim(); if(!t){alertBox('Enter text');return;}
-  try{
-    const r=await fetch('{{ url_for("model_info.api_predict") }}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t})});
-    const d=await r.json();
-    if(!d.ok) throw new Error(d.error||'error');
-    alertBox(`Result: ${d.label} (${(d.prob||0).toFixed(2)})${d.degraded?' · fallback':''}`);
-  }catch(e){alertBox('Error: '+e.message);}
-}
+  // --- Elements ------------------------------------------------------------
+  const elText   = document.getElementById('qtext');
+  const elRes    = document.getElementById('resultBox');
+  const elErr    = document.getElementById('errorBox');
+  const elProbTx = document.getElementById('resProbText');
+  const elBar    = document.getElementById('resBar');
+  const elFall   = document.getElementById('badgeDegraded');
+  const elLabel  = document.getElementById('resLabelBox');
+  const btnPred  = document.getElementById('btnPredict');
+  const btnClear = document.getElementById('btnClear');
+  const predSpin = document.getElementById('predSpin');
+  const statusHint = document.getElementById('statusHint');
+
+  // --- State for debounce / cancellation -----------------------------------
+  let inflightController = null;
+  let debounceId = null;
+
+  // --- UI helpers -----------------------------------------------------------
+  function resetUI() {
+    elErr.classList.add('d-none');
+    elRes.classList.add('d-none');
+    elLabel.innerHTML = '';
+    elProbTx.textContent = '0.000';
+    elBar.style.width = '0%';
+    elBar.setAttribute('aria-valuenow', '0');
+    elBar.className = 'progress-bar';
+    elFall.classList.add('d-none');
+  }
+
+  function setLoading(on) {
+    btnPred.disabled = on || elText.value.trim().length === 0;
+    predSpin.classList.toggle('d-none', !on);
+    statusHint.classList.toggle('d-none', !on);
+  }
+
+  function barClass(prob) {
+    if (prob >= 0.75) return 'bg-success';
+    if (prob >= 0.50) return 'bg-success';
+    if (prob >= 0.35) return 'bg-warning';
+    return 'bg-danger';
+  }
+
+  function renderResult(label, prob, degraded) {
+    // Label with icon + color
+    if (label === 'Positive') {
+      elLabel.innerHTML = '<span class="text-success">✅ Positive</span>';
+    } else {
+      elLabel.innerHTML = '<span class="text-danger">❌ Negative</span>';
+    }
+
+    // Progress bar + value
+    const pct = Math.max(0, Math.min(100, Math.round(prob * 100)));
+    elProbTx.textContent = prob.toFixed(3);
+    elBar.style.width = pct + '%';
+    elBar.setAttribute('aria-valuenow', String(pct));
+    elBar.className = 'progress-bar ' + barClass(prob);
+
+    // Fallback badge
+    if (degraded) elFall.classList.remove('d-none');
+
+    elRes.classList.remove('d-none');
+  }
+
+  function showError(msg) {
+    elErr.textContent = msg;
+    elErr.classList.remove('d-none');
+  }
+
+  // --- Predict flow (debounced + cancelable) --------------------------------
+  function doPredict() {
+    clearTimeout(debounceId);
+    debounceId = setTimeout(runPredict, 120);
+  }
+
+  async function runPredict() {
+    resetUI();
+    const text = (elText.value || '').trim();
+    if (!text) {
+      showError('Please enter some text first.');
+      return;
+    }
+
+    // Cancel previous request if any
+    if (inflightController) inflightController.abort();
+    inflightController = new AbortController();
+
+    setLoading(true);
+    try {
+      const res = await fetch('{{ url_for("model_info.api_predict") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+        signal: inflightController.signal
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'Prediction failed.');
+      renderResult(data.label, Number(data.prob || 0), !!data.degraded);
+    } catch (e) {
+      if (e.name !== 'AbortError') showError('Error: ' + e.message);
+    } finally {
+      setLoading(false);
+      inflightController = null;
+    }
+  }
+
+  function doClear() {
+    if (inflightController) inflightController.abort();
+    elText.value = '';
+    resetUI();
+    setLoading(false);
+    elText.focus();
+  }
+
+  // --- Events ---------------------------------------------------------------
+  btnPred.addEventListener('click', doPredict);
+  btnClear.addEventListener('click', doClear);
+
+  // Enable/disable Predict button depending on text presence
+  elText.addEventListener('input', () => setLoading(false));
+
+  // Keyboard shortcut: Ctrl+Enter (Win/Linux) / Cmd+Enter (macOS)
+  elText.addEventListener('keydown', (ev) => {
+    if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter') {
+      ev.preventDefault();
+      doPredict();
+    }
+  });
+
+  // Initial state
+  resetUI();
+  setLoading(false);
 </script>
 {% endblock %}

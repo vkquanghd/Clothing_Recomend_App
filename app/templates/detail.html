@@ -41,8 +41,6 @@
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-start">
             <h6 class="mb-1">{{ r.title or "(no title)" }}</h6>
-
-            {# Optional sentiment badge (only if backend stored them later) #}
             {% if r.get('prediction') == 'Positive' %}
               <span class="badge bg-success">Positive ({{ '%.2f'|format(r.get('confidence', 0)) }})</span>
             {% elif r.get('prediction') == 'Negative' %}
@@ -56,7 +54,6 @@
 
           <div class="d-flex justify-content-between align-items-center small text-muted">
             <div class="d-flex flex-wrap gap-3 align-items-center">
-
               <!-- Rating as stars -->
               <span>
                 {% set full = (r.rating or 0)|int %}
@@ -66,14 +63,14 @@
                 <span class="ms-1">{{ r.rating }}/5</span>
               </span>
 
-              <!-- Recommended IND -->
+              <!-- Recommended -->
               {% if r.recommended == 1 %}
                 <span class="badge bg-success">Recommended</span>
               {% else %}
                 <span class="badge bg-secondary">Not Recommended</span>
               {% endif %}
 
-              <!-- Positive Feedback Count -->
+              <!-- Helpful votes -->
               <span title="Helpful votes">👍 {{ r.positive_feedback or 0 }}</span>
 
               <!-- Age -->
@@ -81,30 +78,51 @@
             </div>
 
             <div class="d-flex gap-2">
-              <button class="btn btn-sm btn-outline-secondary"
-                      onclick="openEdit({{ r|tojson }})">Edit</button>
-              <button class="btn btn-sm btn-outline-danger"
-                      onclick="deleteReview({{ r.id }})">Delete</button>
+              <!-- Use data-* to avoid JSON serialization issues -->
+              <button
+                class="btn btn-sm btn-outline-secondary"
+                data-review-id="{{ r.id }}"
+                data-review-title="{{ r.title|default('', true) }}"
+                data-review-text="{{ r.review_text|default('', true) }}"
+                data-review-rating="{{ r.rating }}"
+                data-review-rec="{{ 1 if r.recommended==1 else 0 }}"
+                data-review-age="{{ r.age or '' }}"
+                data-review-pf="{{ r.positive_feedback if r.positive_feedback is not none else '' }}"
+                onclick="openEditFromBtn(this)">
+                Edit
+              </button>
+              <button class="btn btn-sm btn-outline-danger" onclick="deleteReview({{ r.id }})">Delete</button>
             </div>
           </div>
         </div>
       </div>
       {% endfor %}
 
-      {% if rpages and rpages > 1 %}
+      {% if rpages > 1 %}
       <nav class="mt-3">
-        <ul class="pagination pagination-sm">
-          <li class="page-item {% if rpage<=1 %}disabled{% endif %}">
-            <a class="page-link" href="{{ url_for('main.detail', item_id=item.clothing_id, rpage=rpage-1) }}">Prev</a>
-          </li>
+        <ul class="pagination pagination-sm justify-content-center">
+          {% if rpage > 1 %}
+            <li class="page-item">
+              <a class="page-link" href="{{ url_for('main.detail', item_id=item.clothing_id, rpage=rpage-1) }}">Prev</a>
+            </li>
+          {% endif %}
+          {% set window = 2 %}
           {% for p in range(1, rpages+1) %}
-          <li class="page-item {% if p==rpage %}active{% endif %}">
-            <a class="page-link" href="{{ url_for('main.detail', item_id=item.clothing_id, rpage=p) }}">{{ p }}</a>
-          </li>
+            {% if p==1 or p==rpages or (p>=rpage-window and p<=rpage+window) %}
+              <li class="page-item {% if p==rpage %}active{% endif %}">
+                <a class="page-link" href="{{ url_for('main.detail', item_id=item.clothing_id, rpage=p) }}">{{ p }}</a>
+              </li>
+            {% elif p==2 and rpage-window>3 %}
+              <li class="page-item disabled"><span class="page-link">…</span></li>
+            {% elif p==rpages-1 and rpage+window<rpages-2 %}
+              <li class="page-item disabled"><span class="page-link">…</span></li>
+            {% endif %}
           {% endfor %}
-          <li class="page-item {% if rpage>=rpages %}disabled{% endif %}">
-            <a class="page-link" href="{{ url_for('main.detail', item_id=item.clothing_id, rpage=rpage+1) }}">Next</a>
-          </li>
+          {% if rpage < rpages %}
+            <li class="page-item">
+              <a class="page-link" href="{{ url_for('main.detail', item_id=item.clothing_id, rpage=rpage+1) }}">Next</a>
+            </li>
+          {% endif %}
         </ul>
       </nav>
       {% endif %}
@@ -159,89 +177,296 @@
     </div>
   </div>
 </div>
+
+<!-- Edit Review Modal -->
+<div class="modal fade" id="editReviewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Edit Review</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="edit-error" class="alert alert-danger d-none"></div>
+
+        <input type="hidden" id="edit-id">
+
+        <div class="row g-3">
+          <div class="col-md-8">
+            <label class="form-label">Title</label>
+            <input id="edit-title" class="form-control" placeholder="Title">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Rating</label>
+            <select id="edit-rating" class="form-select">
+              <option>1</option><option>2</option><option>3</option>
+              <option>4</option><option>5</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Recommendation</label>
+            <select id="edit-rec" class="form-select">
+              <option value="0">Not Rec</option>
+              <option value="1">Rec</option>
+            </select>
+          </div>
+        </div>
+
+        <label class="form-label mt-3">Review Text</label>
+        <textarea id="edit-text" class="form-control" rows="4" placeholder="Your review…"></textarea>
+
+        <div class="row g-3 mt-2">
+          <div class="col-md-4">
+            <label class="form-label">Age</label>
+            <input id="edit-age" type="number" class="form-control" min="1" max="120" placeholder="Age">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Helpful votes</label>
+            <input id="edit-pf" type="number" class="form-control" min="0" placeholder="0">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer d-flex justify-content-between">
+        <button class="btn btn-outline-primary" id="btnEditAISuggest">
+          <span class="spinner-border spinner-border-sm me-2 d-none" id="aiSpinEdit" role="status" aria-hidden="true"></span>
+          AI Suggest
+        </button>
+        <div class="d-flex gap-2">
+          <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" id="btnEditSave">
+            <span class="spinner-border spinner-border-sm me-2 d-none" id="saveSpinEdit" role="status" aria-hidden="true"></span>
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-  function toast(msg, type='info') {
-    const el = document.createElement('div');
-    el.className = `alert alert-${type} position-fixed top-0 start-50 translate-middle-x mt-3 shadow`;
-    el.style.zIndex = 2000;
-    el.innerText = msg;
-    document.body.appendChild(el);
-    setTimeout(() => el.remove(), 1800);
+/* ----------------------- Tiny utilities ----------------------- */
+function toast(msg, type = 'info', ms = 1800) {
+  const el = document.createElement('div');
+  el.className = `alert alert-${type} position-fixed top-0 start-50 translate-middle-x mt-3 shadow`;
+  el.style.zIndex = 2000;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), ms);
+}
+
+function setBtnLoading(btn, isLoading, textWhenIdle) {
+  if (!btn) return;
+  if (isLoading) {
+    btn.disabled = true;
+    btn.dataset._label = btn.innerHTML;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Processing…`;
+  } else {
+    btn.disabled = false;
+    if (textWhenIdle) btn.textContent = textWhenIdle;
+    else if (btn.dataset._label) btn.innerHTML = btn.dataset._label;
+    delete btn.dataset._label;
+  }
+}
+
+/* ----------------------- Write (Create) ----------------------- */
+async function aiSuggest() {
+  const title = document.getElementById('f-title').value.trim();
+  const text  = document.getElementById('f-text').value.trim();
+  const reviewText = text || title;
+  if (!reviewText) { toast('Type something first', 'warning'); return; }
+
+  try {
+    const res = await fetch('{{ url_for("model_info.api_predict") }}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: reviewText })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'AI error');
+    toast(`AI: ${data.label} (${(data.prob ?? 0).toFixed(2)})`,
+          data.label === 'Positive' ? 'success' : 'danger');
+    document.getElementById('f-rec').value = data.label === 'Positive' ? '1' : '0';
+  } catch (e) {
+    toast('AI suggest failed: ' + e.message, 'danger');
+  }
+}
+
+async function submitReview() {
+  const btn = document.querySelector('#tab-write .btn.btn-primary');
+  const payload = {
+    title: (document.getElementById('f-title').value || '').trim(),
+    review_text: (document.getElementById('f-text').value || '').trim(),
+    age: parseInt(document.getElementById('f-age').value || '0', 10),
+    rating: parseInt(document.getElementById('f-rating').value, 10),
+    recommended: parseInt(document.getElementById('f-rec').value, 10),
+    positive_feedback: parseInt(document.getElementById('f-pf').value || '0', 10),
+  };
+
+  if (!payload.title || !payload.review_text) {
+    toast('Please fill title & text', 'warning'); 
+    return;
   }
 
-  // AI Suggest -> call the model_info JSON API you already have
-  async function aiSuggest() {
-    const reviewText = document.getElementById('f-text').value.trim()
-                      || document.getElementById('f-title').value.trim();
-    if (!reviewText) { toast('Type something first', 'warning'); return; }
-    try {
-      const res = await fetch('{{ url_for("model_info.api_predict") }}', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: reviewText })
-      });
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error || 'AI error');
-      toast(`AI: ${data.label} (${(data.prob || 0).toFixed(2)})`,
-            data.label === 'Positive' ? 'success' : 'danger');
-      // Optional: auto set recommendation from AI
-      document.getElementById('f-rec').value = data.label === 'Positive' ? '1' : '0';
-    } catch (e) {
-      toast('AI suggest failed', 'danger');
-    }
+  try {
+    setBtnLoading(btn, true);
+    const res = await fetch('{{ url_for("main.api_create_review", item_id=item.clothing_id) }}', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok || data.ok === false) throw new Error(data.error || 'Create failed');
+    location.reload();
+  } catch (e) {
+    toast('Submit failed: ' + e.message, 'danger');
+  } finally {
+    setBtnLoading(btn, false, 'Submit');
+  }
+}
+
+function clearWrite() {
+  ['f-title','f-text','f-age','f-pf'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-rating').value = '4';
+  document.getElementById('f-rec').value = '1';
+}
+
+/* ----------------------- Delete ----------------------- */
+async function deleteReview(id) {
+  if (!confirm('Delete this review?')) return;
+  const btn = event?.currentTarget;
+
+  try {
+    setBtnLoading(btn, true);
+    const url = '{{ url_for("main.api_delete_review", review_id=0) }}'.replace('0', id);
+    const res = await fetch(url, { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok || data.ok === false) throw new Error(data.error || 'Delete failed');
+
+    document.getElementById('rev-' + id)?.remove();
+    toast('Deleted', 'success');
+  } catch (e) {
+    toast('Delete failed: ' + e.message, 'danger');
+  } finally {
+    setBtnLoading(btn, false, 'Delete');
+  }
+}
+
+/* ----------------------- EDIT modal ----------------------- */
+let editModal, editModalEl;
+
+document.addEventListener('DOMContentLoaded', () => {
+  editModalEl = document.getElementById('editReviewModal');
+  if (editModalEl) {
+    editModal = new bootstrap.Modal(editModalEl);
+  }
+  document.getElementById('btnEditAISuggest')?.addEventListener('click', aiSuggestEdit);
+  document.getElementById('btnEditSave')?.addEventListener('click', submitEdit);
+});
+
+// Called by Edit button using data-* attributes (no JSON encode needed)
+function openEditFromBtn(btn) {
+  if (!editModal) return;
+  const ds = btn.dataset;
+
+  document.getElementById('edit-id').value     = ds.reviewId || '';
+  document.getElementById('edit-title').value  = ds.reviewTitle || '';
+  document.getElementById('edit-text').value   = ds.reviewText || '';
+  document.getElementById('edit-rating').value = ds.reviewRating || '3';
+  document.getElementById('edit-rec').value    = ds.reviewRec || '0';
+
+  // Prefill age & helpful votes (blank if 0/empty)
+  document.getElementById('edit-age').value = ds.reviewAge && parseInt(ds.reviewAge, 10) > 0 ? ds.reviewAge : '';
+  document.getElementById('edit-pf').value  = ds.reviewPf !== undefined && ds.reviewPf !== '' ? ds.reviewPf : '';
+
+  document.getElementById('edit-error').classList.add('d-none');
+  editModal.show();
+}
+
+// AI Suggest within modal
+async function aiSuggestEdit() {
+  const btn  = document.getElementById('btnEditAISuggest');
+  const spin = document.getElementById('aiSpinEdit');
+  const text = (document.getElementById('edit-text').value || '').trim()
+            || (document.getElementById('edit-title').value || '').trim();
+  if (!text) { showEditError('Type something first.'); return; }
+
+  try {
+    setBtnLoading(btn, true);
+    spin?.classList.remove('d-none');
+
+    const r = await fetch('{{ url_for("model_info.api_predict") }}', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ text })
+    });
+    const d = await r.json();
+    if (!r.ok || d.ok === false) throw new Error(d.error || 'AI error');
+
+    // Apply AI hint to recommendation
+    document.getElementById('edit-rec').value = d.label === 'Positive' ? '1' : '0';
+    toast(`AI: ${d.label} (${(d.prob ?? 0).toFixed(2)})`, d.label === 'Positive' ? 'success' : 'danger');
+  } catch (e) {
+    showEditError('AI suggest failed: ' + (e.message || ''));
+  } finally {
+    spin?.classList.add('d-none');
+    setBtnLoading(btn, false, 'AI Suggest');
+  }
+}
+
+function showEditError(msg) {
+  const box = document.getElementById('edit-error');
+  box.textContent = msg;
+  box.classList.remove('d-none');
+}
+
+// Save changes
+async function submitEdit() {
+  const btn  = document.getElementById('btnEditSave');
+  const spin = document.getElementById('saveSpinEdit');
+  const id   = document.getElementById('edit-id').value;
+
+  const ageVal = (document.getElementById('edit-age').value || '').trim();
+  const pfVal  = (document.getElementById('edit-pf').value || '').trim();
+  const ageNum = ageVal === '' ? undefined : Math.max(1, Math.min(120, parseInt(ageVal, 10) || 0));
+  const pfNum  = pfVal  === '' ? undefined : Math.max(0, parseInt(pfVal, 10) || 0);
+
+  const payload = {
+    title: (document.getElementById('edit-title').value || '').trim(),
+    review_text: (document.getElementById('edit-text').value || '').trim(),
+    rating: parseInt(document.getElementById('edit-rating').value, 10),
+    recommended: parseInt(document.getElementById('edit-rec').value, 10),
+    ...(ageNum !== undefined ? { age: ageNum } : {}),
+    ...(pfNum  !== undefined ? { positive_feedback: pfNum } : {}),
+  };
+
+  if (!payload.title || !payload.review_text) {
+    showEditError('Please fill title & text.');
+    return;
   }
 
-  async function submitReview() {
-    const payload = {
-      title: document.getElementById('f-title').value.trim(),
-      review_text: document.getElementById('f-text').value.trim(),
-      age: parseInt(document.getElementById('f-age').value || '0', 10),
-      rating: parseInt(document.getElementById('f-rating').value, 10),
-      recommended: parseInt(document.getElementById('f-rec').value, 10),
-      positive_feedback: parseInt(document.getElementById('f-pf').value || '0', 10),
-    };
-    if (!payload.title || !payload.review_text) {
-      toast('Please fill title & text', 'warning'); return;
-    }
-    try {
-      const res = await fetch('{{ url_for("main.api_create_review", item_id=item.clothing_id) }}', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json();
-      if (!data.ok) throw new Error();
-      location.reload();
-    } catch {
-      toast('Submit failed', 'danger');
-    }
-  }
+  try {
+    setBtnLoading(btn, true);
+    spin?.classList.remove('d-none');
 
-  function clearWrite() {
-    ['f-title','f-text','f-age','f-pf'].forEach(id => document.getElementById(id).value = '');
-    document.getElementById('f-rating').value = '4';
-    document.getElementById('f-rec').value = '1';
-  }
+    const url = '{{ url_for("main.api_update_review", review_id=0) }}'.replace('0', id);
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok || data.ok === false) throw new Error(data.error || 'Update failed');
 
-  async function deleteReview(id) {
-    if (!confirm('Delete this review?')) return;
-    try {
-      const url = '{{ url_for("main.api_delete_review", review_id=0) }}'.replace('0', id);
-      const res = await fetch(url, { method: 'DELETE' });
-      const data = await res.json();
-      if (!data.ok) throw new Error();
-      document.getElementById('rev-' + id)?.remove();
-      toast('Deleted', 'success');
-    } catch {
-      toast('Delete failed', 'danger');
-    }
+    toast('Updated', 'success');
+    location.reload(); // refresh to redraw stars/badges/snippet consistently
+  } catch (e) {
+    showEditError(e.message || 'Update failed.');
+  } finally {
+    spin?.classList.add('d-none');
+    setBtnLoading(btn, false, 'Save');
   }
-
-  function openEdit(r) {
-    toast('Edit UI not implemented in this snippet.', 'secondary');
-  }
+}
 </script>
 {% endblock %}

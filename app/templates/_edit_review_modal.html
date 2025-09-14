@@ -1,0 +1,54 @@
+<!-- Edit Review Modal (Bootstrap 5) -->
+<div class="modal fade" id="editReviewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Edit Review</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Hidden review id -->
+        <input type="hidden" id="edit-id" />
+
+        <div class="row g-3">
+          <div class="col-md-8">
+            <label class="form-label">Title</label>
+            <input id="edit-title" class="form-control" placeholder="Title">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Rating</label>
+            <select id="edit-rating" class="form-select">
+              <option>1</option><option>2</option><option>3</option>
+              <option>4</option><option>5</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Recommendation</label>
+            <select id="edit-rec" class="form-select">
+              <option value="0">Not Rec</option>
+              <option value="1">Rec</option>
+            </select>
+          </div>
+        </div>
+
+        <label class="form-label mt-3">Review Text</label>
+        <textarea id="edit-text" class="form-control" rows="6" placeholder="Write your review…"></textarea>
+
+        <div id="edit-error" class="alert alert-danger mt-3 d-none"></div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="btnEditAISuggest" class="btn btn-outline-primary">
+          <span class="spinner-border spinner-border-sm me-2 d-none" id="aiSpinEdit"></span>
+          AI Suggest
+        </button>
+        <button id="btnEditSave" class="btn btn-primary">
+          <span class="spinner-border spinner-border-sm me-2 d-none" id="saveSpinEdit"></span>
+          Save
+        </button>
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>

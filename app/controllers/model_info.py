@@ -4,11 +4,18 @@ from pathlib import Path
 from typing import Any, Optional, Iterable
 from flask import Blueprint, request, render_template, jsonify, current_app, has_app_context
 
-# dill preferred; fallback to std pickle
+# Prefer joblib for models saved via joblib.dump; fallback to dill/pickle
 try:
-    import dill as pickle  # pip install dill
+    import joblib  # noqa
 except Exception:  # pragma: no cover
-    import pickle  # type: ignore
+    joblib = None  # type: ignore
+
+try:
+    import dill as dpickle  # noqa
+except Exception:  # pragma: no cover
+    dpickle = None
+
+import pickle as spickle  # stdlib pickle (last resort)
 
 bp = Blueprint("model_info", __name__, url_prefix="/model")
 
@@ -23,9 +30,10 @@ class EnsembleBundle:
         if not self.models:
             raise RuntimeError("No base models in EnsembleBundle")
         probs = []
+        X = list(texts)
         for m in self.models.values():
             if hasattr(m, "predict_proba"):
-                probs.append(m.predict_proba(list(texts))[:, 1])
+                probs.append(m.predict_proba(X)[:, 1])
             else:
                 raise RuntimeError("Base model lacks predict_proba")
         probs = np.vstack(probs)
@@ -48,30 +56,59 @@ def _root() -> Path:
 def _model_path() -> Path:
     return _root() / "model" / "ensemble_soft.pkl"
 
+def _try_joblib(p: Path) -> Any:
+    if joblib is None:
+        raise RuntimeError("joblib not available")
+    return joblib.load(p)
+
+def _try_dill(p: Path) -> Any:
+    if dpickle is None:
+        raise RuntimeError("dill not available")
+    with open(p, "rb") as f:
+        return dpickle.load(f)
+
+def _try_std_pickle(p: Path) -> Any:
+    with open(p, "rb") as f:
+        return spickle.load(f)
+
 def _load():
+    """Load model once. Try joblib first, then dill, then std pickle. Fallback to rule-based."""
     global _model, _model_err, _degraded
     if _model is not None or _model_err is not None:
         return
+
     p = _model_path()
     if not p.exists():
         _model_err = f"Model file not found: {p}"
         _use_rule_based_fallback()
         return
-    try:
-        with open(p, "rb") as f:
-            _model = pickle.load(f)       # dill or pickle
-    except Exception as e:
-        _model_err = f"Failed to load model: {e!r}"
-        _use_rule_based_fallback()
+
+    # Try loaders in order
+    errors = []
+    for loader_name, loader_func in (
+        ("joblib", _try_joblib),
+        ("dill", _try_dill),
+        ("pickle", _try_std_pickle),
+    ):
+        try:
+            _model = loader_func(p)
+            _model_err = None
+            return
+        except Exception as e:
+            errors.append(f"{loader_name}: {type(e).__name__}: {e}")
+
+    # If all failed -> fallback
+    _model_err = "Failed to load model → " + " | ".join(errors)
+    _use_rule_based_fallback()
 
 def _use_rule_based_fallback():
-    # Tiny sentiment heuristic so the app keeps working
+    """Tiny sentiment heuristic so the app keeps working."""
     global _model, _degraded
     pos = {"love","great","amazing","perfect","good","excellent","nice","recommend","best","beautiful","happy"}
     neg = {"bad","worst","poor","terrible","hate","awful","disappoint","return","ugly","broken","sad"}
     class Rule:
         def predict_proba(self, X):
-            import numpy as np, re
+            import numpy as np
             out = []
             for t in X:
                 s = (t or "").lower()
@@ -102,15 +139,15 @@ def _predict_one(text: str):
     return label, prob
 
 # ---- routes ----------------------------------------------------------------
-@bp.get("/predict")
-def quick_predict():
+# IMPORTANT: set endpoint explicitly so url_for('model_info.quick_predict') always works
+@bp.route("/predict", methods=["GET"], endpoint="quick_predict")
+def quick_predict_view():
     _load()
-    # Show error banner (and whether we’re using fallback)
     err = _model_err
     return render_template("predict.html", text="", result=None, prob=None, error=err, degraded=_degraded)
 
-@bp.post("/api/predict")
-def api_predict():
+@bp.route("/api/predict", methods=["POST"], endpoint="api_predict")
+def api_predict_view():
     try:
         data = request.get_json(silent=True) or {}
         text = (data.get("text") or "").strip()
@@ -121,8 +158,8 @@ def api_predict():
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
-@bp.get("/metrics")
-def metrics():
+@bp.route("/metrics", methods=["GET"], endpoint="metrics")
+def metrics_view():
     _load()
     status = "ready (fallback)" if _degraded else ("ready" if _model and not _model_err else "error")
     return render_template("metrics.html", status=status, error=_model_err, manifest={})
