@@ -1,4 +1,4 @@
-#!/Users/mac/Desktop/dem-web/.venv/bin/python3.12
+#!/Users/mac/Desktop/dem-web/.venv/bin/python
 import sys
 from tqdm.cli import main
 if __name__ == '__main__':

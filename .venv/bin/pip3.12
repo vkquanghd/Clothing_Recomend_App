@@ -1,4 +1,4 @@
-#!/Users/mac/Desktop/dem-web/.venv/bin/python3.12
+#!/Users/mac/Desktop/dem-web/.venv/bin/python
 # -*- coding: utf-8 -*-
 import re
 import sys

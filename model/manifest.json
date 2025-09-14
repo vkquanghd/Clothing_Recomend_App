@@ -1,14 +1,29 @@
 {
-  "bundle_name": "VotingClassifier: LR + CNB + CharSVM (soft)",
+  "bundle_name": "VotingClassifier (LR + CNB + CharSVM)",
   "weights": {
-    "tfidf_lr": 1.0,
-    "tfidf_cnb": 1.0,
-    "char_svm": 1.0
+    "tfidf_lr": 0.9,
+    "tfidf_cnb": 0.9,
+    "char_svm": 1.2
   },
-  "notes": "Pure sklearn object (no custom class) \u2014 fixes EnsembleBundle pickle issue.",
+  "threshold": 0.6,
+  "post_prob_heuristic": true,
+  "heuristic_delta": 0.08,
+  "neg_phrases": [
+    "cheap fabric",
+    "itchy",
+    "poor fit",
+    "returned",
+    "runs large",
+    "runs small",
+    "scratchy",
+    "see through",
+    "too small",
+    "too tight",
+    "uncomfortable"
+  ],
   "word_ngram": "(1,3)",
   "char_ngram": "(3,5)",
   "samples": 19662,
   "positives": 16087,
-  "data_csv": "/Users/mac/Desktop/dem-web/data/assignment3_II.csv"
+  "notes": "Keep negation/intensity tokens; slight char-model upweight; optional heuristic nudge (too tight, runs small, ...)."
 }
