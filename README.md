@@ -1,41 +1,46 @@
-📄 README.md
+# 🧾 Review Classifier 
 
- # Review Classifier (Milestone II)
+Review Classifier is a system built with **Flask + scikit-learn + SQLite + Python scripts** to classify clothing reviews as **Recommended / Not Recommended**.  
+It extends **Milestone I** by training multiple models, combining them into an ensemble, and deploying them into a **Flask Web UI**.
 
- Review Classifier is a system built with **Flask + scikit-learn + Python scripts** to classify clothing reviews as recommended or not recommended.
+---
 
- It was developed as **Milestone II** of the assignment, extending Milestone I by training multiple models, exporting them as an ensemble, and integrating into a full Flask Web UI.
+## ✨ Features
 
- ---
+- 📝 Train multiple models:
+  - CountVectorizer + Logistic Regression
+  - TF-IDF + Logistic Regression
+  - TF-IDF + SVD + Logistic Regression
+- 🤝 Final Ensemble: **equal-weight soft voting** of all three models.
+- 📦 Export artifacts:
+  - `model/ensemble.pkl` (scikit-learn VotingClassifier).
+  - `model/manifest.json` (metadata).
+- 🌐 Flask Web Application:
+  - **Quick Predict** from review text (`/predict`).
+  - **Add / Edit / Delete Reviews** interactively.
+  - **AI Suggest**: auto-recommendation hint from classifier.
+  - **Metrics page** for model status.
+  - **Search + pagination** for browsing items.
+- 🗂 Data management:
+  - Dataset stored in **SQLite (`data/app.db`)**.
+  - Items and reviews can be queried with pagination.
 
- ## ✨ Features
+---
 
- - 📝 Train multiple models (Count+LR, TFIDF+LR, TFIDF+SVD+LR).
- - 🤝 Combine them into an **ensemble bundle** (`model/ensemble.pkl`).
- - 📦 Export a **manifest.json** with metadata (weights, tokenizer).
- - 🌐 Flask Web UI:
-   - Predict recommendation from new reviews (`/predict`).
-   - Add new reviews interactively (`/new`).
-   - Visualize metrics (`/metrics`).
-   - Search products by categories (`/search`).
-   - Pagination for large results.
- - 🗂 Generate a JSON catalog (`data/site_items.json`) for keyword + category search.
+## ⚙️ Requirements
 
- ---
+- Python **3.9+** (tested with 3.12).
+- pip + venv.
+- Git.
+- SQLite (already bundled with Python).
 
- ## ⚙️ Requirements
-
- - Python **3.9+** (tested with 3.12).
- - pip + venv.
- - Git.
-
- ---
+---
 
  ## 🚀 Setup Guide
 
 ### 1. Clone the repository
  ```bash
- git clone https://github.com/<your-username>/review-classifier.git
+ git clone https://github.com/vkquanghd/Clothing_Recomend_App.git
  cd review-classifier
  ```
 
@@ -59,16 +64,20 @@
  pip install -r requirements.txt
  ```
 
- ### 4. Train Models with Notebook
- Open Jupyter Notebook:
- ```bash
- jupyter notebook notebooks/milestone2.ipynb
- ```
+### 4. Preprocessing and Train Models with Notebooks
+
+Open Jupyter Notebook:
+
+```bash
+jupyter notebook notebooks/preprocessing.ipynb
+jupyter notebook notebooks/model_training.ipynb
+```
+ 
  Run all cells to:
- - Analyze dataset.
+ - Preprocess and analyze the dataset.
  - Train 3 models.
- - Save bundle (`model/ensemble.pkl`).
- - Generate `data/site_items.json`.
+ - Save the ensemble bundle (model/ensemble.pkl).
+ - Generate data/site_items.json.
 
  ### 5. Run the Flask App
 
@@ -90,15 +99,23 @@
 
  🗂 Project Structure
 
- review-classifier/
+review-classifier/
  ├── app/
- │   ├── controllers/   # Flask routes (main, search)
- │   ├── templates/     # HTML templates (predict.html, new_review.html, metrics.html, search.html, base.html)
- │   ├── static/        # CSS, JS, assets
+ │   ├── controllers/   # Flask routes (main, review, model_info)
+ │   ├── templates/     # HTML templates (detail.html, predict.html, metrics.html, base.html)
+ │   ├── static/        # CSS, JS, images
  │   └── __init__.py
- ├── model/             # Trained ensemble bundle (.pkl + manifest.json)
- ├── data/              # Dataset + generated catalog (assignment3_II.csv, site_items.json)
- ├── notebooks/         # Jupyter notebook for Milestone II
+ ├── data/
+ │   ├── app.db         # SQLite database
+ │   ├── site_items.json
+ │   ├── site_reviews.json
+ │   └── assignment3_II.csv
+ ├── model/
+ │   ├── ensemble.pkl   # Exported ensemble
+ │   └── manifest.json
+ ├── notebooks/
+ │   └── model_training.ipynb
+ │   └── preprocessing.ipynb
  ├── requirements.txt
  └── README.md
 
@@ -117,18 +134,64 @@
  - `Department Name`
  - `Class Name`
 
- In Milestone II we focus on:
- - Training models on **Review Text**.
- - Using **categories** (`Rating`, `Division`, `Department`, `Class`) for search and filtering in UI.
 
- ---
+## 🗄️ Database Schema
+
+The dataset is split into two tables inside **SQLite**:
+
+### `items`
+- `clothing_id` (**PK**)  
+- `division`  
+- `department`  
+- `class_name`  
+- `description`  
+
+### `reviews`
+- `id` (**PK**)  
+- `clothing_id` (**FK → items.clothing_id**)  
+- `age`  
+- `title`  
+- `review_text`  
+- `rating`  
+- `recommended`  
+- `positive_feedback`  
+
+
+📐 ERD
+
+erDiagram
+    ITEMS {
+      INTEGER clothing_id PK
+      TEXT    division
+      TEXT    department
+      TEXT    class_name
+      TEXT    description
+    }
+
+    REVIEWS {
+      INTEGER id PK
+      INTEGER clothing_id FK
+      INTEGER age
+      TEXT    title
+      TEXT    review_text
+      INTEGER rating
+      INTEGER recommended "0/1"
+      INTEGER positive_feedback
+    }
+
+    ITEMS ||--o{ REVIEWS : "has many"
+---
+
 
  ## 📈 Models
 
- - **CountVectorizer + Logistic Regression**
- - **TF-IDF + Logistic Regression**
- - **TF-IDF + SVD (LSA) + Logistic Regression**
- - **Ensemble (equal weights)**
+- **Base Models**
+  - CountVectorizer + Logistic Regression  
+  - TF-IDF + Logistic Regression  
+  - TF-IDF + SVD + Logistic Regression  
+
+- **Final Model**
+  - Ensemble of all three (equal weights)  
 
  Metrics evaluated:
  - Accuracy

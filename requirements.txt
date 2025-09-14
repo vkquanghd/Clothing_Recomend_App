@@ -1,18 +1,46 @@
-# Web
+# ---------------------------
+# Web Framework
+# ---------------------------
 flask==3.0.3
 jinja2==3.1.4
 
-#
+# ---------------------------
+# Database
+# ---------------------------
+sqlite-utils==3.36  # optional but handy for SQLite DB operations
+
+# ---------------------------
+# Core Scientific Stack
+# ---------------------------
 numpy==1.26.4
 scipy==1.11.4
 pandas==2.2.2
 
-# ML / NLP
+# ---------------------------
+# Machine Learning / NLP
+# ---------------------------
 scikit-learn==1.4.2
 nltk==3.9.1
 gensim==4.3.3
 joblib==1.4.2
+dill==0.3.8          # advanced pickle (needed for model loading)
+threadpoolctl==3.5.0 # sklearn dependency
 
-# Viz (optional but handy)
+# ---------------------------
+# Visualization (optional)
+# ---------------------------
 matplotlib==3.8.4
 seaborn==0.13.2
+
+# ---------------------------
+# Jupyter / Notebook
+# ---------------------------
+jupyter==1.0.0
+notebook==7.2.2
+ipykernel==6.29.5
+
+# ---------------------------
+# Utilities
+# ---------------------------
+tqdm==4.66.5   # progress bars for training
+click==8.1.7   # CLI utility (used by Flask)
