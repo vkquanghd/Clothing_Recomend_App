@@ -159,27 +159,29 @@ The dataset is split into two tables inside **SQLite**:
 
 📐 ERD
 
+```mermaid
 erDiagram
     ITEMS {
-      INTEGER clothing_id PK
-      TEXT    division
-      TEXT    department
-      TEXT    class_name
-      TEXT    description
+        INTEGER clothing_id PK
+        TEXT division
+        TEXT department
+        TEXT class_name
+        TEXT description
     }
 
     REVIEWS {
-      INTEGER id PK
-      INTEGER clothing_id FK
-      INTEGER age
-      TEXT    title
-      TEXT    review_text
-      INTEGER rating
-      INTEGER recommended "0/1"
-      INTEGER positive_feedback
+        INTEGER id PK
+        INTEGER clothing_id FK
+        INTEGER age
+        TEXT title
+        TEXT review_text
+        INTEGER rating
+        INTEGER recommended "0/1"
+        INTEGER positive_feedback
     }
 
     ITEMS ||--o{ REVIEWS : "has many"
+```
 ---
 
 
