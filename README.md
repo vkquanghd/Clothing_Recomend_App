@@ -111,7 +111,7 @@ review-classifier/
  │   ├── 📄 site_reviews.json  
  │   └── 📄 assignment3_II.csv  
  ├── 📂 model/  
- │   ├── 📄 ensemble.pkl       # Exported ensemble  
+ │   ├── 📄 ensemble_soft.pkl       # Exported ensemble  
  │   └── 📄 manifest.json  
  ├── 📂 notebooks/  
  │   ├── 📄 model_training.ipynb  
