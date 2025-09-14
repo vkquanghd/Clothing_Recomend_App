@@ -96,25 +96,24 @@ jupyter notebook notebooks/model_training.ipynb
  👉 Now open: http://127.0.0.1:5000/
 
  ---
-
- 🗂 Project Structure
+📂 Project Structure
 
 review-classifier/
  ├── app/
- │   ├── controllers/   # Flask routes (main, review, model_info)
- │   ├── templates/     # HTML templates (detail.html, predict.html, metrics.html, base.html)
- │   ├── static/        # CSS, JS, images
+ │   ├── controllers/       # Flask routes (main, review, model_info)
+ │   ├── templates/         # HTML templates (detail.html, predict.html, metrics.html, base.html)
+ │   ├── static/            # CSS, JS, images
  │   └── __init__.py
  ├── data/
- │   ├── app.db         # SQLite database
+ │   ├── app.db             # SQLite database
  │   ├── site_items.json
  │   ├── site_reviews.json
  │   └── assignment3_II.csv
  ├── model/
- │   ├── ensemble.pkl   # Exported ensemble
+ │   ├── ensemble.pkl       # Exported ensemble
  │   └── manifest.json
  ├── notebooks/
- │   └── model_training.ipynb
+ │   ├── model_training.ipynb
  │   └── preprocessing.ipynb
  ├── requirements.txt
  └── README.md
